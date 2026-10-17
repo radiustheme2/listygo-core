@@ -1,0 +1,89 @@
+<?php
+/**
+ * Demo Importer Initialization
+ *
+ * This file initializes the easy demo importer.
+ *
+ * @package RT\Listygo_Core\DemoImporter
+ */
+
+// Do not allow directly accessing this file.
+if ( ! defined( 'ABSPATH' ) ) {
+	exit( 'This script cannot be accessed directly.' );
+}
+
+if ( ! defined( 'LISTYGO_CORE_DEMO_IMPORTER_PATH' ) ) {
+	define( 'LISTYGO_CORE_DEMO_IMPORTER_PATH', __DIR__ );
+}
+
+if ( ! defined( 'LISTYGO_CORE_DEMO_IMPORTER_URL' ) ) {
+	define( 'LISTYGO_CORE_DEMO_IMPORTER_URL', plugin_dir_url( __FILE__ ) );
+}
+
+// phpcs:disable WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedVariableFound
+
+/**
+ * PSR-4 Autoloader for Demo Importer
+ */
+spl_autoload_register(
+	function ( $class ) {
+		$namespaces = [
+			'RT\\Listygo_Core\\DemoImporter\\' => __DIR__ . '/src/',
+		];
+
+		foreach ( $namespaces as $namespace => $base_dir ) {
+			$len = strlen( $namespace );
+
+			if ( strncmp( $namespace, $class, $len ) !== 0 ) {
+				continue;
+			}
+
+			$relative_class = substr( $class, $len );
+			$file           = $base_dir . str_replace( '\\', '/', $relative_class ) . '.php';
+
+			if ( file_exists( $file ) ) {
+				require_once $file;
+				return;
+			}
+		}
+	}
+);
+
+// Load Configuration.
+$config_file = __DIR__ . '/config.php';
+
+if ( ! file_exists( $config_file ) ) {
+	wp_die( 'Demo Importer Configuration file not found: ' . esc_html( $config_file ) );
+}
+
+$demo_config = require $config_file;
+
+if ( ! is_array( $demo_config ) ) {
+	wp_die( 'Invalid demo configuration. Configuration must return an array.' );
+}
+
+// Get current theme information.
+$current_theme = wp_get_theme();
+$theme_slug    = $current_theme->get_stylesheet();
+$theme_name    = $current_theme->get( 'Name' );
+
+// Inject current theme information.
+$demo_config = array_merge(
+	[
+		'theme_name'       => $theme_name,
+		'theme_slug'       => $theme_slug,
+		'core_base_dir'    => LISTYGO_CORE_BASE_DIR,
+		'demo_content_dir' => LISTYGO_CORE_DEMO_IMPORTER_PATH,
+		'demo_content_url' => LISTYGO_CORE_DEMO_IMPORTER_URL,
+		'commenter_email'  => get_option( 'admin_email' ),
+	],
+	$demo_config
+);
+
+// Initialize the demo importer.
+try {
+	new RT\Listygo_Core\DemoImporter\Core( $demo_config );
+	new RT\Listygo_Core\DemoImporter\FastImporter();
+} catch ( Exception $e ) {
+	wp_die( 'Failed to initialize Demo Importer: ' . esc_html( $e->getMessage() ) );
+}
